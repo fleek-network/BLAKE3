@@ -1,8 +1,8 @@
 [package]
-name = "blake3"
+name = "fleek-blake3"
 version = "1.5.0"
-authors = ["Jack O'Connor <oconnor663@gmail.com>", "Samuel Neves"]
-description = "the BLAKE3 hash function"
+authors = ["Jack O'Connor <oconnor663@gmail.com>", "Samuel Neves", "Parsa Ghadimi <i@parsa.ooo>"]
+description = "the BLAKE3 hash function forked for Fleek Network"
 repository = "https://github.com/BLAKE3-team/BLAKE3"
 license = "CC0-1.0 OR Apache-2.0"
 documentation = "https://docs.rs/blake3"
@@ -16,28 +16,28 @@ default = ["std"]
 # which is currently x86-only. If "neon" is on, NEON support is assumed. Note
 # that AArch64 always supports NEON, but support on ARMv7 varies. The NEON
 # implementation uses C intrinsics and requires a C compiler.
-neon = []
+neon = ["blake3/neon"]
 
 # This crate uses libstd for std::io trait implementations, and also for
 # runtime CPU feature detection. This feature is enabled by default. If you use
 # --no-default-features, the only way to use the SIMD implementations in this
 # crate is to enable the corresponding instruction sets statically for the
 # entire build, with e.g. RUSTFLAGS="-C target-cpu=native".
-std = []
+std = ["blake3/std"]
 
 # The `rayon` feature (disabled by default, but enabled for docs.rs) adds the
 # `update_rayon` and (in combination with `mmap` below) `update_mmap_rayon`
 # methods, for multithreaded hashing. However, even if this feature is enabled,
 # all other APIs remain single-threaded.
-rayon = ["dep:rayon", "std"]
+rayon = ["dep:rayon", "std", "blake3/rayon"]
 
 # The `mmap` feature (disabled by default, but enabled for docs.rs) adds the
 # `update_mmap` and (in combination with `rayon` above) `update_mmap_rayon`
 # helper methods for memory-mapped IO.
-mmap = ["std", "dep:memmap2"]
+mmap = ["std", "dep:memmap2", "blake3/mmap"]
 
 # Implement the zeroize::Zeroize trait for types in this crate.
-zeroize = ["dep:zeroize", "arrayvec/zeroize"]
+zeroize = ["dep:zeroize", "arrayvec/zeroize", "blake3/zeroize"]
 
 # This crate implements traits from the RustCrypto project, exposed here as the
 # "traits-preview" feature. However, these traits aren't stable, and they're
@@ -46,7 +46,7 @@ zeroize = ["dep:zeroize", "arrayvec/zeroize"]
 # who use it should expect breaking changes between patch versions of this
 # crate. (The "*-preview" feature name follows the conventions of the RustCrypto
 # "signature" crate.)
-traits-preview = ["digest"]
+traits-preview = ["digest", "blake3/traits-preview"]
 
 # ---------- Features below this line are undocumented and unstable. ----------
 # The following features are mainly intended for testing and benchmarking, and
@@ -62,13 +62,13 @@ traits-preview = ["digest"]
 # that fallback, for testing purposes. (Note that in CI testing, we set the
 # BLAKE3_CI environment variable, which instructs build.rs to error out rather
 # than doing an automatic fallback.)
-pure = []
+pure = ["blake3/pure"]
 
 # As described above, on x86_64 this crate use assembly implementations by
 # default. Enabling the "prefer_intrinsics" feature makes this crate use
 # intrinsics implementations on both 32-bit and 64-bit x86, again for testing
 # purposes.
-prefer_intrinsics = []
+prefer_intrinsics = ["blake3/prefer_intrinsics"]
 
 # Disable individual instruction sets. CI testing uses these flags to simulate
 # different levels of hardware SIMD support. Note that code for the
@@ -81,11 +81,11 @@ prefer_intrinsics = []
 # level turns out to be the right approach, then we can design a stable
 # feature. Until then, we reserve the right to break these features in a patch
 # release.
-no_sse2 = []
-no_sse41 = []
-no_avx2 = []
-no_avx512 = []
-no_neon = []
+no_sse2 = ["blake3/no_sse2"]
+no_sse41 = ["blake3/no_sse41"]
+no_avx2 = ["blake3/no_avx2"]
+no_avx512 = ["blake3/no_avx512"]
+no_neon = ["blake3/no_neon"]
 
 [package.metadata.docs.rs]
 # Document the rayon/mmap methods and the Serialize/Deserialize/Zeroize impls on docs.rs.
@@ -101,6 +101,7 @@ memmap2 = { version = "0.7.1", optional = true }
 rayon = { version = "1.2.1", optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 zeroize = { version = "1", default-features = false, features = ["zeroize_derive"], optional = true }
+blake3 = "1.5.0"
 
 [dev-dependencies]
 hmac = "0.12.0"

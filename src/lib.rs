@@ -1,5 +1,6 @@
-//! The official Rust implementation of the [BLAKE3] cryptographic hash
-//! function.
+//! Disclaimer: This is a fork of the [official](https://github.com/BLAKE3-team/BLAKE3)
+//! Rust implementation of Blake3 suited and modified for
+//! [Fleek Network](https://fleek.network/), a decentralized edge network.
 //!
 //! # Examples
 //!
@@ -85,9 +86,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(test)]
-mod test;
-
 // The guts module is for incremental use cases like the `bao` crate that need
 // to explicitly compute chunk and parent chaining values. It is semi-stable
 // and likely to keep working, but largely undocumented and not intended for
@@ -97,35 +95,10 @@ pub mod guts;
 
 /// Undocumented and unstable, for benchmarks only.
 #[doc(hidden)]
-pub mod platform;
+pub use blake3::platform;
 
-// Platform-specific implementations of the compression function. These
-// BLAKE3-specific cfg flags are set in build.rs.
-#[cfg(blake3_avx2_rust)]
-#[path = "rust_avx2.rs"]
-mod avx2;
-#[cfg(blake3_avx2_ffi)]
-#[path = "ffi_avx2.rs"]
-mod avx2;
-#[cfg(blake3_avx512_ffi)]
-#[path = "ffi_avx512.rs"]
-mod avx512;
-#[cfg(blake3_neon)]
-#[path = "ffi_neon.rs"]
-mod neon;
-mod portable;
-#[cfg(blake3_sse2_rust)]
-#[path = "rust_sse2.rs"]
-mod sse2;
-#[cfg(blake3_sse2_ffi)]
-#[path = "ffi_sse2.rs"]
-mod sse2;
-#[cfg(blake3_sse41_rust)]
-#[path = "rust_sse41.rs"]
-mod sse41;
-#[cfg(blake3_sse41_ffi)]
-#[path = "ffi_sse41.rs"]
-mod sse41;
+/// Implementation of functionality related to the tree.
+pub mod tree;
 
 #[cfg(feature = "traits-preview")]
 pub mod traits;
@@ -138,6 +111,9 @@ use arrayvec::{ArrayString, ArrayVec};
 use core::cmp;
 use core::fmt;
 use platform::{Platform, MAX_SIMD_DEGREE, MAX_SIMD_DEGREE_OR_2};
+
+#[doc(hidden)]
+pub use blake3::IncrementCounter;
 
 /// The number of bytes in a [`Hash`](struct.Hash.html), 32.
 pub const OUT_LEN: usize = 32;
@@ -160,16 +136,6 @@ const IV: &CVWords = &[
     0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 ];
 
-const MSG_SCHEDULE: [[usize; 16]; 7] = [
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8],
-    [3, 4, 10, 12, 13, 2, 7, 14, 6, 5, 9, 0, 11, 15, 8, 1],
-    [10, 7, 12, 9, 14, 3, 13, 15, 4, 0, 11, 2, 5, 8, 1, 6],
-    [12, 13, 9, 11, 15, 10, 14, 8, 7, 2, 5, 3, 0, 1, 6, 4],
-    [9, 14, 11, 5, 8, 12, 15, 1, 13, 3, 0, 10, 2, 6, 4, 7],
-    [11, 15, 5, 0, 1, 9, 8, 6, 14, 10, 2, 12, 3, 4, 7, 13],
-];
-
 // These are the internal flags that we use to domain separate root/non-root,
 // chunk/parent, and chunk beginning/middle/end. These get set at the high end
 // of the block flags word in the compression function, so their values start
@@ -181,16 +147,6 @@ const ROOT: u8 = 1 << 3;
 const KEYED_HASH: u8 = 1 << 4;
 const DERIVE_KEY_CONTEXT: u8 = 1 << 5;
 const DERIVE_KEY_MATERIAL: u8 = 1 << 6;
-
-#[inline]
-fn counter_low(counter: u64) -> u32 {
-    counter as u32
-}
-
-#[inline]
-fn counter_high(counter: u64) -> u32 {
-    (counter >> 32) as u32
-}
 
 /// An output of the default size, 32 bytes, which provides constant-time
 /// equality checking.
@@ -545,39 +501,6 @@ impl fmt::Debug for ChunkState {
             .field("flags", &self.flags)
             .field("platform", &self.platform)
             .finish()
-    }
-}
-
-// IMPLEMENTATION NOTE
-// ===================
-// The recursive function compress_subtree_wide(), implemented below, is the
-// basis of high-performance BLAKE3. We use it both for all-at-once hashing,
-// and for the incremental input with Hasher (though we have to be careful with
-// subtree boundaries in the incremental case). compress_subtree_wide() applies
-// several optimizations at the same time:
-// - Multithreading with Rayon.
-// - Parallel chunk hashing with SIMD.
-// - Parallel parent hashing with SIMD. Note that while SIMD chunk hashing
-//   maxes out at MAX_SIMD_DEGREE*CHUNK_LEN, parallel parent hashing continues
-//   to benefit from larger inputs, because more levels of the tree benefit can
-//   use full-width SIMD vectors for parent hashing. Without parallel parent
-//   hashing, we lose about 10% of overall throughput on AVX2 and AVX-512.
-
-/// Undocumented and unstable, for benchmarks only.
-#[doc(hidden)]
-#[derive(Clone, Copy)]
-pub enum IncrementCounter {
-    Yes,
-    No,
-}
-
-impl IncrementCounter {
-    #[inline]
-    fn yes(&self) -> bool {
-        match self {
-            IncrementCounter::Yes => true,
-            IncrementCounter::No => false,
-        }
     }
 }
 

@@ -1,5 +1,9 @@
 # <a href="#"><img src="media/BLAKE3.svg" alt="BLAKE3" height=50></a>
 
+> Disclaimer: This is a fork of the [official](https://github.com/BLAKE3-team/BLAKE3)
+> Rust implementation of Blake3 suited and modified for
+> [Fleek Network](https://fleek.network/), a decentralized edge network.
+
 BLAKE3 is a cryptographic hash function that is:
 
 - **Much faster** than MD5, SHA-1, SHA-2, SHA-3, and BLAKE2.
